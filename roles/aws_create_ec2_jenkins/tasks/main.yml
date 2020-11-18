@@ -1,0 +1,20 @@
+- name: launch ansible cloudformation example
+  cloudformation:
+    stack_name: "{{stackname}}"
+    state: "present"
+    region: "{{region}}"
+    disable_rollback: true
+    aws_access_key: "{{aws_access_key}}"
+    aws_secret_key: "{{aws_secret_key}}"
+    template: "roles/aws_create_ec2_jenkins/files/crossix.yaml"
+    template_parameters:
+      KeyName: "{{KeyName}}"
+      ServerName: "{{ServerName}}"
+      Vpc: "{{Vpc}}"
+      SubnetId: "{{SubnetId}}"
+      ImageId: "{{ImageId}}"
+      InstanceType: "{{InstanceType}}"
+      YourInternetIP: "{{YourInternetIP}}/32"
+      SSHPort: "{{SSHPort}}"
+      JenkinsPort: "{{JenkinsPort}}"
+      App1Port: "{{App1Port}}"

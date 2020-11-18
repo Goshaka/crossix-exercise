@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  Crossix 
+
+Parameters:
+  ServerName:
+    Type: String
+    Description: An environment name that will be prefixed to resource names
+
+  Vpc:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC to which the server is deployed
+
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet in which to deploy the server
+
+
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Name of key pair to allow SSH access to the Crossix server
+    # Default: crossix
+
+  ImageId:
+    Type:  String
+    Description: AMI ID, defaulting to the latest Amazon ECS-Optimized AMI (linux) for the region
+
+  InstanceType:
+    Type: String
+
+
+  YourInternetIP:
+    Type: String
+    Description: Your external IPAddress
+
+
+  SSHPort:
+    Type: String
+    Description:  Port for SSH connection
+    Default: 22
+
+  JenkinsPort:
+    Type: String
+    Description:  Port for SSH connection
+    Default: 22
+
+  App1Port:
+    Type: String
+    Description:  Port for SSH connection
+    Default: 22
+
+Resources:
+ 
+  CrossixSecurityGroupPort:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref Vpc
+      GroupDescription: SSH access to the Crossix server over specific port
+      SecurityGroupIngress:
+        #Allow ssh access from a specified block of addresses
+        - CidrIp: !Ref YourInternetIP
+          Description: SSH access to the Crossix server
+          IpProtocol: tcp
+          FromPort: !Ref SSHPort
+          ToPort: !Ref SSHPort
+
+        - CidrIp:  !Ref YourInternetIP
+          Description: Port 8080 access 
+          IpProtocol: tcp
+          FromPort: !Ref JenkinsPort
+          ToPort: !Ref JenkinsPort
+
+        - CidrIp:  !Ref YourInternetIP
+          Description: Port 80
+          IpProtocol: tcp
+          FromPort: !Ref App1Port
+          ToPort: !Ref App1Port
+
+  CrossixEc2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub ${ServerName}-Crossix-ec2-role-${AWS::Region}
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+
+
+  CrossixHostPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${ServerName}-Crossix-host-policy
+      Roles:
+        - !Ref CrossixEc2Role
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - ec2:Describe*
+              - ec2:DeleteTags
+              - ec2:CreateTags
+              - logs:CreateLogGroup
+            Resource: "*"
+
+  CrossixProfile:  
+    DependsOn: CrossixHostPolicy  
+    Type: 'AWS::IAM::InstanceProfile'  
+    Properties:  
+      Roles:  
+        - !Ref CrossixEc2Role  
+
+
+  Crossix:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref CrossixSecurityGroupPort
+      IamInstanceProfile: !Ref CrossixProfile
+      SubnetId: !Ref SubnetId
+      UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/sh
+          echo 'Doing a "yum update"'
+          yum update -
+          wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat/jenkins.repo
+          rpm --import https://pkg.jenkins.io/redhat/jenkins.io.key
+          sed -i "s/gpgcheck=1/gpgcheck=0/g" /etc/yum.repos.d/jenkins.repo
+          yum install -y jenkins
+          echo 'jenkins ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+          echo 'Installing Java'
+          yum install -y java-1.8.
+          echo 'Starting Jenkins service'
+          service jenkins start
+          sleep 1
+          cat /var/lib/jenkins/secrets/initialAdminPassword             
+          
+      Tags:
+        - Key: Name
+          Value: !Sub ${ServerName}-Crossix-server
+
+
+
+  IPAddress:
+    Type: AWS::EC2::EIP
+  IPAssoc:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref 'Crossix'
+      EIP: !Ref 'IPAddress'
+

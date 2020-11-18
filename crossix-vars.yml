@@ -1,0 +1,16 @@
+stackname: crossixexercise
+aws_access_key: ''
+aws_secret_key: ''
+region: us-east-1
+template: roles/aws_create_ec2_jenkins/files/crossix.yaml
+template_parameters:
+KeyName: crossix
+ServerName: crossix
+Vpc: vpc-491df834
+SubnetId: subnet-712bfc50
+ImageId: ami-02d096b4878c881c0
+InstanceType: t2.micro
+YourInternetIP: ''
+SSHPort: 22
+JenkinsPort: 8080
+App1Port: 80
